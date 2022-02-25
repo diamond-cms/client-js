@@ -1,6 +1,6 @@
 {
   "name": "@diam/js",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Diamond JS library",
   "author": "diamond-cms",
   "license": "MIT",
@@ -16,6 +16,7 @@
     "start": "microbundle-crl watch --no-compress --format modern,cjs"
   },
   "devDependencies": {
+    "babel-eslint": "^10.1.0",
     "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.7.0",
     "eslint-config-standard": "^14.1.0",
