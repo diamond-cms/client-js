@@ -1,31 +1,46 @@
-import { useEffect, useMemo, useContext, useState, createContext } from 'react'
-import API from './api'
+import fetch from 'isomorphic-fetch'
 
-const refs = { uuid: 1, diamond: undefined }
-const context = createContext(refs)
+const DIAMOND_HOST = 'https://app.diam.io'
 
-export function useDiamondUser(initUser) {
-  const [user, setUser] = useState(initUser)
-  const { diamond } = useContext(context)
-  const id = useMemo(() => refs.uuid++, [])
-  useEffect(() => {
-    diamond.listenUserChange(id, setUser)
-    return () => {
-      diamond.unlistenUserChange(id)
+export function login(callback, host = DIAMOND_HOST) {
+  const height = 700
+  const width = 500
+  const top = (screen.height - height) / 2
+  const left = (screen.width - width) / 2
+  const loginWindow = window.open(`${host}/api/settings/login`, 'login', [
+    'toolbar=no',
+    'location=yes',
+    'directories=no',
+    'status=no',
+    'menubar=no',
+    'copyhistory=no',
+    'scrollbars=yes',
+    'resizable=yes',
+    `height=${height}`,
+    `width=${width}`,
+    `top=${top}`,
+    `left=${left}`,
+  ].join(','))
+  window.addEventListener('message', async (event) => {
+    const { isTrusted, origin, data } = event
+    if (origin === host && isTrusted) {
+      try {
+        const { token, user } = JSON.parse(data)
+        callback(token, user)
+      } catch (e) {}
     }
-  }, [diamond])
-  return user
+  }, false)
 }
 
-export function useDiamondConfig(config) {
-  return useMemo(() => {
-    const diamond = new API(config)
-    refs.diamond = diamond
-    return diamond
-  }, [config])
-}
-
-export function useDiamond() {
-  const { diamond } = useContext(context)
-  return diamond
+export async function query(token, project, gql, host = DIAMOND_HOST) {
+  const response = await fetch(`${host}/api/${project}/graphql`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authentication': `Bearer ${token}`,
+    },
+    credentials: 'include',
+    body: JSON.stringify(gql),
+  })
+  return response.json()
 }
