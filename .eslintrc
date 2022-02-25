@@ -23,6 +23,7 @@
     "react/jsx-handler-names": 0,
     "react/jsx-fragments": 0,
     "react/no-unused-prop-types": 0,
+    "react/jsx-max-props-per-line": [2, { "maximum": 4, "when": "always" }],
     "import/export": 0
   }
 }
