@@ -17,22 +17,21 @@ const LOGIN_WINDOW_SETTINGS = [
   `width=${LOGIN_WINDOW_WIDTH}`,
 ].join(',')
 
-export function login(callback, host = DIAMOND_HOST) {
+export function login(appId, callback, host = DIAMOND_HOST) {
   const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
   const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
   window.open(
-    `${host}/api/settings/login`,
+    `${host}/api/login/${appId}`,
     'login',
     `${LOGIN_WINDOW_SETTINGS},top=${top},left=${left}`,
   )
   window.addEventListener(
     'message',
     async (event) => {
-      const { isTrusted, origin, data } = event
+      const { isTrusted, origin, data: token } = event
       if (origin === host && isTrusted) {
         try {
-          const { token, user } = JSON.parse(data)
-          callback(token, user)
+          callback(token)
         } catch (e) {}
       }
     },
@@ -40,8 +39,8 @@ export function login(callback, host = DIAMOND_HOST) {
   )
 }
 
-export async function query(token, project, gql, host = DIAMOND_HOST) {
-  const response = await fetch(`${host}/api/${project}/graphql`, {
+export async function query(token, gql, host = DIAMOND_HOST) {
+  const response = await fetch(`${host}/api/graphql`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
