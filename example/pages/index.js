@@ -2,9 +2,9 @@ import { useEffect, useCallback, useState } from 'react'
 import { login, query, getCookieServer, getCookie, setCookie } from '@diam/js'
 
 const COOKIE_NAME = 'example-cookie'
-const APP_ID = 'app_example'
+const APP_ID = 'app_idchangeme'
 const EXAMPLE_GQL_QUERY = `query {
-  Spots { items { id, name } }
+  Places { items { id, name } }
 }`
 
 export default function HomePage({ initResult, sessionData }) {
@@ -45,9 +45,9 @@ export default function HomePage({ initResult, sessionData }) {
           <a href="#" onClick={onLogout}>Logout</a>
           <h3>Logged In as: {token}</h3>
           <a href="#" onClick={onFetch}>Fetch</a>
-          {result && result.data && result.data.Spots.items && (
+          {result && result.data && result.data.Places.items && (
             <ol>
-              {result.data.Spots.items.map(({ id, name }) => {
+              {result.data.Places.items.map(({ id, name }) => {
                 return <li key={id}>{name}</li>
               })}
             </ol>)}

@@ -65,5 +65,5 @@ export function getCookie(name) {
 }
 
 export function setCookie(name, token) {
-  document.cookie = `${name}=${token}; Path=/; SameSite=Strict; Secure`
+  document.cookie = `${name}=${token}; Path=/; SameSite=Lax; Secure`
 }
