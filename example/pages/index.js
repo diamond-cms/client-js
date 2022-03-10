@@ -1,75 +1,87 @@
-import { useEffect, useCallback, useState } from 'react'
-import { login, query, getCookieServer, getCookie, setCookie } from '@diam/js'
+import { useEffect, useMemo, useCallback, useState } from 'react'
+import Diamond from '@diam/js'
 
-const COOKIE_NAME = 'example-cookie'
-const APP_ID = 'app_idchangeme'
+const APP_ID = 'app_changeme'
 const EXAMPLE_GQL_QUERY = `query {
   Places { items { id, name } }
 }`
+const diam = Diamond({
+  appId: APP_ID,
+  cookieName: 'example-cookie',
+})
 
-export default function HomePage({ initResult, sessionData }) {
-  const [result, setResult] = useState(initResult)
-  const [token, setToken] = useState('')
-  const onLogin = useCallback(() => {
-    login(APP_ID, (token) => {
-      setCookie(COOKIE_NAME, token)
-      setToken(token)
-    })
-  }, [])
-  useEffect(() => {
-    setToken(getCookie(COOKIE_NAME))
-  }, [])
-  useEffect(() => {
-    if (token) {
-      onFetch()
-    }
+function useDiamond(initToken) {
+  const [loading, setLoading] = useState(!initToken)
+  const [token, setToken] = useState(initToken)
+  const user = useMemo(() => {
+    return diam.user(token)
   }, [token])
-  const onLogout = useCallback(() => {
+  const login = useCallback(() => {
+    diam.login(setToken)
+  }, [])
+  const logout = useCallback(() => {
     setToken('')
-    setCookie(COOKIE_NAME, '')
-  })
+    diam.logout()
+  }, [])
+  useEffect(() => {
+    if (!initToken) {
+      const token = diam.getCookie()
+      if (token) {
+        setToken(token)
+      }
+      setLoading(false)
+    }
+  }, [])
+  return [user, login, logout, loading]
+}
+
+export default function HomePage({ initToken, initResult }) {
+  const [user, login, logout, loading] = useDiamond(initToken)
+  const onLogin = useCallback((e) => {
+    e.preventDefault()
+    login()
+  }, [login])
+  const [result, setResult] = useState(initResult)
   const onFetch = useCallback(async () => {
-    const result = await query(token, {
+    const result = await user.query({
       query: EXAMPLE_GQL_QUERY,
     })
     setResult(result)
-  }, [token])
+  }, [user])
+  useEffect(() => {
+    if (!initResult && !loading) {
+      onFetch()
+    }
+  }, [onFetch, loading])
   return (
     <>
       <h1>Diamond Example App</h1>
-      <pre>{JSON.stringify(sessionData)}</pre>
-      {!token ? (
-        <a href="#" onClick={onLogin}>Login</a>
+      {!user.token ? (
+        <a href="" onClick={onLogin}>Login</a>
       ) : (
-        <>
-          <a href="#" onClick={onLogout}>Logout</a>
-          <h3>Logged In as: {token}</h3>
-          <a href="#" onClick={onFetch}>Fetch</a>
-          {result && result.data && result.data.Places.items && (
-            <ol>
-              {result.data.Places.items.map(({ id, name }) => {
-                return <li key={id}>{name}</li>
-              })}
-            </ol>)}
-        </>
+        <a href="" onClick={logout}>Logout</a>
       )}
+      <h3>Logged In as: {user.token}</h3>
+      <a href="#" onClick={onFetch}>Fetch</a>
+      {result && result.data && result.data.Places.items && (
+        <ol>
+          {result.data.Places.items.map(({ id, name }) => {
+            return <li key={id}>{name}</li>
+          })}
+        </ol>)}
     </>
   )
 }
 
 export async function getServerSideProps({ req }) {
   // Example of server side fetching
-  const token = getCookieServer(req, COOKIE_NAME)
-  if (token) {
-    const sessionData = await query(token, {
-      query: `
-        query { session { userId, project } }
-      `,
-    })
-    const initResult = await query(token, {
+  const initToken = diam.getCookieServer(req)
+  if (initToken) {
+    const user = diam.user(initToken)
+    const initResult = await user.query({
       query: EXAMPLE_GQL_QUERY,
     })
-    return { props: { initResult, sessionData } }
+    return { props: { initToken, initResult } }
   }
   return { props: {} }
 }
