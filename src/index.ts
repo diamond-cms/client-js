@@ -25,7 +25,7 @@ type FetchParams = {
   headers: QueryHeaders,
   body?: string,
 }
-class DiamondUser {
+export class DiamondUser {
   headers: QueryHeaders
   queryUrl: string
   constructor(queryUrl: string, sessionId: string) {
@@ -59,44 +59,44 @@ export type DiamondOptions = {
   cookieName: string,
 }
 
-const DIAMOND_HOST = 'diam.io'
+const DEFAULT_API_HOST = 'diam.io'
 const DEFAULT_COOKIE_NAME = 'session'
-export const defaultOptions = {
-  host: DIAMOND_HOST,
-  cookieName: DEFAULT_COOKIE_NAME,
-  isLocal: false,
-}
 export class Diamond {
-  apiUrl: string
-  projectId: string
   appId: string
+  projectId: string
+  apiOrigin: string
+  apiUrl: string
   cookieName: string
   constructor(options: Partial<DiamondOptions> = {}) {
     const {
-      projectId, appId, host, isLocal, cookieName,
-    } = { ...defaultOptions, ...options }
-    if (!projectId) {
+      projectId, appId,
+      isLocal = false,
+      cookieName = DEFAULT_COOKIE_NAME,
+    } = options
+    if (!projectId && !isLocal) {
       throw new Error('Diamond: Missing projectId')
     }
     if (!appId) {
       throw new Error('Diamond: Missing appId')
     }
-    this.projectId = projectId
     this.appId = appId
-    this.apiUrl = isLocal ? `http://${host}` : `https://${projectId}.${host}`
+    this.projectId = projectId || 'localhost'
+    const apiHost = options.host || (isLocal ? 'localhost' : DEFAULT_API_HOST)
+    this.apiOrigin = isLocal ? `http://${apiHost}` : `https://${projectId}.${apiHost}`
+    this.apiUrl = `${this.apiOrigin}/api/${appId}`
     this.cookieName = cookieName
   }
   login(callback) {
-    const { projectId, appId, apiUrl, cookieName } = this
+    const { apiUrl, apiOrigin, cookieName } = this
     const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
     const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
-    const loginUrl = `${apiUrl}/api/${projectId}/${appId}/auth/login`
+    const loginUrl = `${apiUrl}/auth/login`
     const windowSettings = `${LOGIN_WINDOW_SETTINGS},top=${top},left=${left}`
     window.open(loginUrl, LOGIN_WINDOW_ID, windowSettings)
     window.addEventListener('message', async (event) => {
       const { isTrusted, origin, data } = event
-      if (origin === apiUrl && isTrusted) {
-        const { sessionId, expirySecs } = data
+      if (origin === apiOrigin && isTrusted) {
+        const { sessionId, expirySecs } = JSON.parse(data)
         if (cookieName) {
           this.setCookie(sessionId, expirySecs)
         }
@@ -112,9 +112,7 @@ export class Diamond {
     }, false)
   }
   user(sessionId) {
-    const { appId, apiUrl } = this
-    const queryUrl = `${apiUrl}/api/${appId}`
-    return new DiamondUser(queryUrl, sessionId)
+    return new DiamondUser(this.apiUrl, sessionId)
   }
   logout() {
     this.setCookie('', 0)
@@ -137,7 +135,8 @@ export class Diamond {
   setCookie(token, expirySecs) {
     const { cookieName } = this
     // TODO: set expiry
-    document.cookie = `${cookieName}=${token}; Path=/; SameSite=Lax; Max-Age=${expirySecs}; Secure`
+    const cookieStr = `${cookieName}=${token}; Path=/; SameSite=Lax; Max-Age=${expirySecs}; Secure`
+    document.cookie = cookieStr
   }
 }
 
