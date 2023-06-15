@@ -25,15 +25,24 @@ type FetchParams = {
   headers: QueryHeaders,
   body?: string,
 }
-export class DiamondUser {
+export type DiamondSessionData = {
+  id: string,
+  data: any,
+}
+export type DiamondSessionStore = (sessionData: DiamondSessionData, expirySecs: number) => void
+export class DiamondAPI {
   headers: QueryHeaders
   queryUrl: string
-  constructor(queryUrl: string, sessionId: string) {
+  sessionData: any
+  sessionStore: DiamondSessionStore
+  constructor(queryUrl: string, session: DiamondSessionData, sessionStore: DiamondSessionStore) {
     this.headers = {
       'Content-Type': 'application/json',
-      Authentication: `Bearer ${sessionId}`,
+      Authentication: `Bearer ${session.id}`,
     }
     this.queryUrl = queryUrl
+    this.sessionData = session.data
+    this.sessionStore = sessionStore
   }
   async query(endpoint: string, method: string = 'POST', body = {}) {
     const { headers, queryUrl } = this
@@ -51,27 +60,23 @@ export class DiamondUser {
   }
 }
 
-export type DiamondOptions = {
+export type DiamondOptions = Partial<{
   projectId: string,
   appId: string,
   host: string,
   isLocal: boolean,
-  cookieName: string,
-}
+}>
 
 const DEFAULT_API_HOST = 'diam.io'
-const DEFAULT_COOKIE_NAME = 'session'
 export class Diamond {
   appId: string
   projectId: string
   apiOrigin: string
   apiUrl: string
-  cookieName: string
-  constructor(options: Partial<DiamondOptions> = {}) {
+  constructor(options: DiamondOptions = {}) {
     const {
       projectId, appId,
       isLocal = false,
-      cookieName = DEFAULT_COOKIE_NAME,
     } = options
     if (!projectId && !isLocal) {
       throw new Error('Diamond: Missing projectId')
@@ -84,10 +89,9 @@ export class Diamond {
     const apiHost = options.host || (isLocal ? 'localhost' : DEFAULT_API_HOST)
     this.apiOrigin = isLocal ? `http://${apiHost}` : `https://${projectId}.${apiHost}`
     this.apiUrl = `${this.apiOrigin}/api/${appId}`
-    this.cookieName = cookieName
   }
-  login(callback) {
-    const { apiUrl, apiOrigin, cookieName } = this
+  login(callback: DiamondSessionStore): void {
+    const { apiUrl, apiOrigin } = this
     const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
     const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
     const loginUrl = `${apiUrl}/auth/login`
@@ -96,14 +100,10 @@ export class Diamond {
     window.addEventListener('message', async (event) => {
       const { isTrusted, origin, data } = event
       if (origin === apiOrigin && isTrusted) {
-        const { sessionId, expirySecs } = JSON.parse(data)
-        if (cookieName) {
-          this.setCookie(sessionId, expirySecs)
-        }
+        const { sessionData, expirySecs } = JSON.parse(data)
         try {
           if (callback) {
-            const user = this.user(sessionId)
-            callback(user)
+            callback(sessionData, expirySecs)
           }
         } catch (e) {
           console.log('WARN! Callback error:', e)
@@ -111,32 +111,8 @@ export class Diamond {
       }
     }, false)
   }
-  user(sessionId) {
-    return new DiamondUser(this.apiUrl, sessionId)
-  }
-  logout() {
-    this.setCookie('', 0)
-  }
-  getCookieServer(req) {
-    const { cookieName } = this
-    if (req && req.cookies) {
-      return req.cookies[cookieName]
-    }
-  }
-  getCookie() {
-    const { cookieName } = this
-    const value = `; ${document.cookie}`
-    const parts: string[] = value.split(`; ${cookieName}=`)
-    if (parts.length === 2) {
-      return (parts.pop() || '').split(';').shift()
-    }
-    return ''
-  }
-  setCookie(token, expirySecs) {
-    const { cookieName } = this
-    // TODO: set expiry
-    const cookieStr = `${cookieName}=${token}; Path=/; SameSite=Lax; Max-Age=${expirySecs}; Secure`
-    document.cookie = cookieStr
+  api(sessionData: DiamondSessionData, sessionStore: DiamondSessionStore): DiamondAPI {
+    return new DiamondAPI(this.apiUrl, sessionData, sessionStore)
   }
 }
 
