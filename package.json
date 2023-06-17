@@ -28,8 +28,5 @@
   "files": [
     "dist"
   ],
-  "dependencies": {
-    "encoding": "^0.1.13",
-    "isomorphic-fetch": "^3.0.0"
-  }
+  "dependencies": {}
 }

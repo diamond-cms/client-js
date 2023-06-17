@@ -1,5 +1,3 @@
-import fetch from 'isomorphic-fetch'
-
 const LOGIN_WINDOW_ID = 'diam_login'
 const LOGIN_WINDOW_HEIGHT = 700
 const LOGIN_WINDOW_WIDTH = 500
@@ -44,15 +42,17 @@ export class DiamondAPI {
     this.sessionData = session.data
     this.sessionStore = sessionStore
   }
-  async query(endpoint: string, method: string = 'POST', body = {}) {
+  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
     const { headers, queryUrl } = this
     try {
-      const fetchParams: FetchParams = { method, headers }
+      const fetchParams: FetchParams = { ...otherOpts, method, headers }
       const isGet: boolean = (method.toLowerCase() === 'get')
       if (!isGet) {
         fetchParams.body = JSON.stringify(body)
       }
-      const response = await fetch(`${queryUrl}${endpoint}${isGet ? new URLSearchParams(body) : ''}`, fetchParams)
+      const url = `${queryUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
+      // console.log(fetchParams, isGet, url, fetchParams)
+      const response = await fetch(url, fetchParams)
       return response.json()
     } catch (cause) {
       throw new Error(`diam q: ${body} err: ${cause?.message}`)
@@ -115,5 +115,3 @@ export class Diamond {
     return new DiamondAPI(this.apiUrl, sessionData, sessionStore)
   }
 }
-
-export default Diamond
