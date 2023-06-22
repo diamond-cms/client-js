@@ -16,7 +16,7 @@ const LOGIN_WINDOW_SETTINGS = [
 
 type QueryHeaders = {
   'Content-Type': string,
-  Authentication: string,
+  Authorization: string,
 }
 type FetchParams = {
   method: string,
@@ -36,7 +36,7 @@ export class DiamondAPI {
   constructor(queryUrl: string, session: DiamondSessionData, sessionStore: DiamondSessionStore) {
     this.headers = {
       'Content-Type': 'application/json',
-      Authentication: `Bearer ${session.id}`,
+      Authorization: `Bearer ${session.id}`,
     }
     this.queryUrl = queryUrl
     this.sessionData = session.data
