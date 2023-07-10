@@ -16,7 +16,7 @@ const LOGIN_WINDOW_SETTINGS = [
 
 type QueryHeaders = {
   'Content-Type': string,
-  Authorization: string,
+  Authorization?: string,
 }
 type FetchParams = {
   method: string,
@@ -28,36 +28,8 @@ export type DiamondSessionData = {
   data: any,
 }
 export type DiamondSessionStore = (sessionData: DiamondSessionData, expirySecs: number) => void
+export type LoginCallback = () => void
 export class DiamondAPI {
-  headers: QueryHeaders
-  queryUrl: string
-  sessionData: any
-  sessionStore: DiamondSessionStore
-  constructor(queryUrl: string, session: DiamondSessionData, sessionStore: DiamondSessionStore) {
-    this.headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.id}`,
-    }
-    this.queryUrl = queryUrl
-    this.sessionData = session.data
-    this.sessionStore = sessionStore
-  }
-  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
-    const { headers, queryUrl } = this
-    try {
-      const fetchParams: FetchParams = { ...otherOpts, method, headers }
-      const isGet: boolean = (method.toLowerCase() === 'get')
-      if (!isGet) {
-        fetchParams.body = JSON.stringify(body)
-      }
-      const url = `${queryUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
-      // console.log(fetchParams, isGet, url, fetchParams)
-      const response = await fetch(url, fetchParams)
-      return response.json()
-    } catch (cause) {
-      throw new Error(`diam q: ${body} err: ${cause?.message}`)
-    }
-  }
 }
 
 export type DiamondOptions = Partial<{
@@ -65,6 +37,8 @@ export type DiamondOptions = Partial<{
   appId: string,
   host: string,
   isLocal: boolean,
+  sessionStore: DiamondSessionStore,
+  sessionData: DiamondSessionData,
 }>
 
 const DEFAULT_API_HOST = 'diam.io'
@@ -73,10 +47,33 @@ export class Diamond {
   projectId: string
   apiOrigin: string
   apiUrl: string
+
+  headers: QueryHeaders
+  sessionData: any
+  sessionStore: DiamondSessionStore | undefined
+  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
+    const { headers, apiUrl } = this
+    try {
+      const fetchParams: FetchParams = { ...otherOpts, method, headers }
+      const isGet: boolean = (method.toLowerCase() === 'get')
+      if (!isGet) {
+        fetchParams.body = JSON.stringify(body)
+      }
+      const url = `${apiUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
+      // console.log(fetchParams, isGet, url, fetchParams)
+      const response = await fetch(url, fetchParams)
+      return response.json()
+    } catch (cause) {
+      throw new Error(`diam q: ${body} err: ${cause?.message}`)
+    }
+  }
+
   constructor(options: DiamondOptions = {}) {
     const {
       projectId, appId,
       isLocal = false,
+      sessionStore,
+      sessionData,
     } = options
     if (!projectId && !isLocal) {
       throw new Error('Diamond: Missing projectId')
@@ -89,8 +86,18 @@ export class Diamond {
     const apiHost = options.host || (isLocal ? 'localhost' : DEFAULT_API_HOST)
     this.apiOrigin = isLocal ? `http://${apiHost}` : `https://${projectId}.${apiHost}`
     this.apiUrl = `${this.apiOrigin}/api/${appId}`
+    this.headers = {
+      'Content-Type': 'application/json',
+    }
+    if (sessionData) {
+      this.headers.Authorization = `Bearer ${sessionData.id}`
+      this.sessionData = sessionData.data
+    }
+    if (sessionStore) {
+      this.sessionStore = sessionStore
+    }
   }
-  login(callback: DiamondSessionStore): void {
+  login(callback: LoginCallback): void {
     const { apiUrl, apiOrigin } = this
     const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
     const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
@@ -102,16 +109,16 @@ export class Diamond {
       if (origin === apiOrigin && isTrusted) {
         const { sessionData, expirySecs } = JSON.parse(data)
         try {
-          if (callback) {
-            callback(sessionData, expirySecs)
+          if (sessionData) {
+            if (this.sessionStore) {
+              this.sessionStore(sessionData, expirySecs)
+            }
+            callback()
           }
         } catch (e) {
           console.log('WARN! Callback error:', e)
         }
       }
     }, false)
-  }
-  api(sessionData: DiamondSessionData, sessionStore: DiamondSessionStore): DiamondAPI {
-    return new DiamondAPI(this.apiUrl, sessionData, sessionStore)
   }
 }
