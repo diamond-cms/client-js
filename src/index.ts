@@ -26,7 +26,7 @@ type FetchParams = {
 export type DiamondSessionData = {
   id: string,
   data: any,
-}
+} | null
 export type DiamondSessionStore = (sessionData: DiamondSessionData, expirySecs: number) => void
 export type LoginCallback = () => void
 export class DiamondAPI {
@@ -51,22 +51,6 @@ export class Diamond {
   headers: QueryHeaders
   sessionData: any
   sessionStore: DiamondSessionStore | undefined
-  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
-    const { headers, apiUrl } = this
-    try {
-      const fetchParams: FetchParams = { ...otherOpts, method, headers }
-      const isGet: boolean = (method.toLowerCase() === 'get')
-      if (!isGet) {
-        fetchParams.body = JSON.stringify(body)
-      }
-      const url = `${apiUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
-      // console.log(fetchParams, isGet, url, fetchParams)
-      const response = await fetch(url, fetchParams)
-      return response.json()
-    } catch (cause) {
-      throw new Error(`diam q: ${body} err: ${cause?.message}`)
-    }
-  }
 
   constructor(options: DiamondOptions = {}) {
     const {
@@ -97,7 +81,13 @@ export class Diamond {
       this.sessionStore = sessionStore
     }
   }
-  login(callback: LoginCallback): void {
+  logout(): void {
+    this.sessionData = null
+    if (this.sessionStore) {
+      this.sessionStore(null, 0)
+    }
+  }
+  login(): void {
     const { apiUrl, apiOrigin } = this
     const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
     const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
@@ -110,15 +100,32 @@ export class Diamond {
         const { sessionData, expirySecs } = JSON.parse(data)
         try {
           if (sessionData) {
+            this.headers.Authorization = `Bearer ${sessionData.id}`
+            this.sessionData = sessionData.data
             if (this.sessionStore) {
               this.sessionStore(sessionData, expirySecs)
             }
-            callback()
           }
         } catch (e) {
           console.log('WARN! Callback error:', e)
         }
       }
     }, false)
+  }
+  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
+    const { headers, apiUrl } = this
+    try {
+      const fetchParams: FetchParams = { ...otherOpts, method, headers }
+      const isGet: boolean = (method.toLowerCase() === 'get')
+      if (!isGet) {
+        fetchParams.body = JSON.stringify(body)
+      }
+      const url = `${apiUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
+      // console.log(fetchParams, isGet, url, fetchParams)
+      const response = await fetch(url, fetchParams)
+      return response.json()
+    } catch (cause) {
+      throw new Error(`diam q: ${body} err: ${cause?.message}`)
+    }
   }
 }
