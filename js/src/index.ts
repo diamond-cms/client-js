@@ -87,7 +87,7 @@ export class Diamond {
       this.sessionStore(null, 0)
     }
   }
-  login(): void {
+  login(cb: () => void | undefined): void {
     const { apiUrl, apiOrigin } = this
     const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
     const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
@@ -104,6 +104,9 @@ export class Diamond {
             this.sessionData = sessionData.data
             if (this.sessionStore) {
               this.sessionStore(sessionData, expirySecs)
+            }
+            if (cb) {
+              cb()
             }
           }
         } catch (e) {

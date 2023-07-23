@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@diam/js@^4.0.4":
-  version "4.0.4"
-  resolved "https://registry.yarnpkg.com/@diam/js/-/js-4.0.4.tgz#a3b486fd04404942545d26a2b7614883f45a9929"
-  integrity sha512-7iqhyngHcZexq+qZ6xlFYMeKuQRmclIpuxhqryWQIQkIS9AUD7wvKZLE3Yvn87dzSncIgGbwrycaIWIIPlwjkA==
+"@diam/js@^4.0.5":
+  version "4.0.5"
+  resolved "https://registry.yarnpkg.com/@diam/js/-/js-4.0.5.tgz#824faf6396d0f9d767c426a3f63f93dc731f0e08"
+  integrity sha512-CeeaR1yKo5KSEtG6LLFnVGrE6HkgJ7F2CM3oUk1dEeG2sW24Kn+q4F0Ua9lP+RMgiuwzN+KEfhsyffpW+jGKog==
 
 "@types/prop-types@*":
   version "15.7.5"
