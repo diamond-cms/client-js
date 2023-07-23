@@ -125,7 +125,9 @@ export class Diamond {
       const response = await fetch(url, fetchParams)
       return response.json()
     } catch (cause) {
-      throw new Error(`diam q: ${body} err: ${cause?.message}`)
+      throw new Error(`diam q: ${body} err: ${cause}`)
     }
   }
 }
+
+export { DiamondProvider } from './react'

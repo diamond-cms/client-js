@@ -13,15 +13,10 @@ npm install --save @diam/js
 ## Usage
 
 ```jsx
-import React, { Component } from 'react'
+import { useDiamond } from '@diam/js'
 
-import MyComponent from '@diam/js'
-import '@diam/js/dist/index.css'
-
-class Example extends Component {
-  render() {
-    return <MyComponent />
-  }
+function App() {
+  useDiamond({ project: 'my-project', appId: 'app-id' })
 }
 ```
 
