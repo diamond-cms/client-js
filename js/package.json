@@ -1,0 +1,20 @@
+{
+  "name": "@diam/js",
+  "version": "4.0.4",
+  "description": "Diamond JS library",
+  "author": "diamond-cms",
+  "license": "MIT",
+  "repository": "diamond-cms/client-js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npm run build -- --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6"
+  },
+  "files": ["dist"],
+  "dependencies": {}
+}

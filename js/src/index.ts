@@ -129,5 +129,3 @@ export class Diamond {
     }
   }
 }
-
-export { DiamondProvider } from './react'

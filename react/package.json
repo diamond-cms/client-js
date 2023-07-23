@@ -1,13 +1,13 @@
 {
-  "name": "@diam/js",
-  "version": "4.0.4",
-  "description": "Diamond JS library",
+  "name": "@diam/react",
+  "version": "0.0.1",
+  "description": "Diamond React library",
   "author": "diamond-cms",
   "license": "MIT",
   "repository": "diamond-cms/client-js",
   "main": "dist/index.js",
-  "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "source": "src/index.tsx",
   "scripts": {
     "build": "tsc",
     "dev": "npm run build -- --watch"
@@ -22,5 +22,7 @@
   "peerDependencies": {
     "react": "^18.2.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@diam/js": "^4.0.4"
+  }
 }
