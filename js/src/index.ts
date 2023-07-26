@@ -41,6 +41,13 @@ export type DiamondOptions = Partial<{
   sessionData: DiamondSessionData,
 }>
 
+type SubscriptionFn = (newValue: any) => void
+type UnsubscribeFn = () => void
+type GetValueReturn = UnsubscribeFn | any
+type GetValueOptions = {
+  sub?: SubscriptionFn
+}
+
 const DEFAULT_API_HOST = 'diam.io'
 export class Diamond {
   appId: string
@@ -48,7 +55,7 @@ export class Diamond {
   apiOrigin: string
   apiUrl: string
 
-  headers: QueryHeaders
+  private headers: QueryHeaders
   sessionData: any
   sessionStore: DiamondSessionStore | undefined
 
@@ -79,6 +86,13 @@ export class Diamond {
     }
     if (sessionStore) {
       this.sessionStore = sessionStore
+    }
+  }
+  setToken(token: string | undefined) {
+    if (token) {
+      this.headers.Authorization = `Bearer ${token}`
+    } else {
+      delete this.headers.Authorization
     }
   }
   logout(): void {
@@ -113,8 +127,23 @@ export class Diamond {
           console.log('WARN! Callback error:', e)
         }
       }
-    }, false)
+    }, {
+      once: true,
+      capture: false
+    })
   }
+  async getValue(resourceId: string, options: GetValueOptions = {}): Promise<GetValueReturn> {
+    const value = await this.query(resourceId)
+    const { sub } = options
+    if (sub) {
+      sub(value)
+      return () => {}
+    } else {
+      return value
+    }
+  }
+  // trigger things:
+  // - volatile, ordered, "atomic"/ack required
   async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
     const { headers, apiUrl } = this
     try {
