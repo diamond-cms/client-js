@@ -1,18 +1,3 @@
-const LOGIN_WINDOW_ID = 'diam_login'
-const LOGIN_WINDOW_HEIGHT = 700
-const LOGIN_WINDOW_WIDTH = 500
-const LOGIN_WINDOW_SETTINGS = [
-  'toolbar=no',
-  'location=yes',
-  'directories=no',
-  'status=no',
-  'menubar=no',
-  'copyhistory=no',
-  'scrollbars=yes',
-  'resizable=yes',
-  `height=${LOGIN_WINDOW_HEIGHT}`,
-  `width=${LOGIN_WINDOW_WIDTH}`,
-].join(',')
 
 type QueryHeaders = {
   'Content-Type': string,
@@ -23,48 +8,30 @@ type FetchParams = {
   headers: QueryHeaders,
   body?: string,
 }
-export type DiamondSessionData = {
-  id: string,
-  data: any,
-} | null
-export type DiamondSessionStore = (sessionData: DiamondSessionData, expirySecs: number) => void
-export type LoginCallback = () => void
-export class DiamondAPI {
-}
 
 export type DiamondOptions = Partial<{
   projectId: string,
   appId: string,
   host: string,
   isLocal: boolean,
-  sessionStore: DiamondSessionStore,
-  sessionData: DiamondSessionData,
+  accessToken: string,
 }>
 
-type SubscriptionFn = (newValue: any) => void
-type UnsubscribeFn = () => void
-type GetValueReturn = UnsubscribeFn | any
-type GetValueOptions = {
-  sub?: SubscriptionFn
-}
-
 const DEFAULT_API_HOST = 'diam.io'
-export class Diamond {
+export class Diamond<SessionType = any> {
   appId: string
   projectId: string
   apiOrigin: string
   apiUrl: string
 
   private headers: QueryHeaders
-  sessionData: any
-  sessionStore: DiamondSessionStore | undefined
+  session?: SessionType
 
-  constructor(options: DiamondOptions = {}) {
+  constructor(options: DiamondOptions) {
     const {
       projectId, appId,
       isLocal = false,
-      sessionStore,
-      sessionData,
+      accessToken,
     } = options
     if (!projectId && !isLocal) {
       throw new Error('Diamond: Missing projectId')
@@ -80,12 +47,8 @@ export class Diamond {
     this.headers = {
       'Content-Type': 'application/json',
     }
-    if (sessionData) {
-      this.headers.Authorization = `Bearer ${sessionData.id}`
-      this.sessionData = sessionData.data
-    }
-    if (sessionStore) {
-      this.sessionStore = sessionStore
+    if (accessToken) {
+      this.setToken(accessToken)
     }
   }
   setToken(token: string | undefined) {
@@ -93,53 +56,6 @@ export class Diamond {
       this.headers.Authorization = `Bearer ${token}`
     } else {
       delete this.headers.Authorization
-    }
-  }
-  logout(): void {
-    this.sessionData = null
-    if (this.sessionStore) {
-      this.sessionStore(null, 0)
-    }
-  }
-  login(cb: () => void | undefined): void {
-    const { apiUrl, apiOrigin } = this
-    const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
-    const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
-    const loginUrl = `${apiUrl}/auth/login`
-    const windowSettings = `${LOGIN_WINDOW_SETTINGS},top=${top},left=${left}`
-    window.open(loginUrl, LOGIN_WINDOW_ID, windowSettings)
-    window.addEventListener('message', async (event) => {
-      const { isTrusted, origin, data } = event
-      if (origin === apiOrigin && isTrusted) {
-        const { sessionData, expirySecs } = JSON.parse(data)
-        try {
-          if (sessionData) {
-            this.headers.Authorization = `Bearer ${sessionData.id}`
-            this.sessionData = sessionData.data
-            if (this.sessionStore) {
-              this.sessionStore(sessionData, expirySecs)
-            }
-            if (cb) {
-              cb()
-            }
-          }
-        } catch (e) {
-          console.log('WARN! Callback error:', e)
-        }
-      }
-    }, {
-      once: true,
-      capture: false
-    })
-  }
-  async getValue(resourceId: string, options: GetValueOptions = {}): Promise<GetValueReturn> {
-    const value = await this.query(resourceId)
-    const { sub } = options
-    if (sub) {
-      sub(value)
-      return () => {}
-    } else {
-      return value
     }
   }
   // trigger things:

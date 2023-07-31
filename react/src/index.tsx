@@ -1,54 +1,113 @@
-import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { Diamond, DiamondOptions, DiamondSessionData, DiamondSessionStore } from '@diam/js'
+import { ReactNode, createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { Diamond, DiamondOptions } from '@diam/js'
 
-const UserContext = createContext<Diamond | undefined>(undefined)
-const Provider = UserContext.Provider
 
-type DiamondReactSessionStore = [DiamondSessionData | undefined, DiamondSessionStore]
+type DiamondReactContext = {
+  client?: Diamond
+  session?: any
+  setSession?: DiamondSessionStore
+}
+const diamondContext = createContext<DiamondReactContext>({})
+const Provider = diamondContext.Provider
+
+const LOGIN_WINDOW_ID = 'diam_login'
+const LOGIN_WINDOW_HEIGHT = 700
+const LOGIN_WINDOW_WIDTH = 500
+const LOGIN_WINDOW_SETTINGS = [
+  'toolbar=no',
+  'location=yes',
+  'directories=no',
+  'status=no',
+  'menubar=no',
+  'copyhistory=no',
+  'scrollbars=yes',
+  'resizable=yes',
+  `height=${LOGIN_WINDOW_HEIGHT}`,
+  `width=${LOGIN_WINDOW_WIDTH}`,
+].join(',')
+
+export type DiamondReactOptions = DiamondOptions & { cookie: string }
 type AppProps = {
-  options: DiamondOptions,
-  sessionStore: DiamondReactSessionStore,
+  options: DiamondReactOptions,
+  getSession?: (diamond: Diamond, sessionData: any) => any,
   children: ReactNode,
 }
-export function DiamondApp({ options, sessionStore, children }: AppProps) {
+
+export function DiamondApp({ options, getSession, children }: AppProps) {
+  const { cookie } = options
+  const [sessionData, setSession] = useCookieStore(cookie)
   const client = useMemo<Diamond>(() => {
     return new Diamond({
       ...options,
-      sessionStore: sessionStore[1],
-      sessionData: sessionStore[0],
+      accessToken: sessionData ? sessionData.id : undefined,
     })
-  }, [options, sessionStore])
+  }, [options, getSession, sessionData])
+  const session = useMemo(() => {
+    if (getSession) {
+      return getSession(client, sessionData ? sessionData.data : undefined)
+    }
+  }, [client])
   return (
-    <Provider value={client}>{children}</Provider>
+    <Provider value={{ client, session, setSession }}>{children}</Provider>
   )
 }
 
 export function useDiamond() {
-  return useContext(UserContext)
+  return useContext(diamondContext).client
 }
 
-export function useDiamondValue(resourceId: string, defaultValue: any): any {
-  const client = useDiamond()
-  const [value, setValue] = useState(defaultValue)
-  useEffect(() => {
-    function updateValue(newValue: any) {
-      if (newValue) {
-        setValue(newValue)
+export function useDiamondSession() {
+  return useContext(diamondContext).session
+}
+
+export function useDiamondLogout() {
+  const { setSession } = useContext(diamondContext)
+  return useCallback(() => {
+    setSession && setSession(null, -1)
+  }, [setSession])
+}
+
+export function useDiamondLogin() {
+  const { client, setSession } = useContext(diamondContext)
+  return useCallback(() => {
+    if (!client) {
+      throw new Error('missing_diamond_client')
+    }
+    const { apiUrl, apiOrigin } = client
+    const top = (screen.height - LOGIN_WINDOW_HEIGHT) / 2
+    const left = (screen.width - LOGIN_WINDOW_WIDTH) / 2
+    const loginUrl = `${apiUrl}/auth/login`
+    const windowSettings = `${LOGIN_WINDOW_SETTINGS},top=${top},left=${left}`
+    window.open(loginUrl, LOGIN_WINDOW_ID, windowSettings)
+    window.addEventListener('message', async (event) => {
+      const { isTrusted, origin, data } = event
+      if (origin === apiOrigin && isTrusted) {
+        const { sessionData, expirySecs } = JSON.parse(data)
+        try {
+          if (sessionData) {
+            client.setToken(sessionData.id)
+            if (setSession) {
+              setSession(sessionData, expirySecs)
+            }
+          }
+        } catch (e) {
+          console.log('WARN! Callback error:', e)
+        }
       }
-    }
-    let unsubscribe: () => void
-    (async () => {
-      unsubscribe = await client?.getValue(resourceId, { sub: updateValue })
-    })()
-    return () => {
-      unsubscribe && unsubscribe()
-    }
-  }, [client])
-  return value
+    }, {
+      once: true,
+      capture: false
+    })
+  }, [client, setSession])
 }
 
-
-function saveSessionCookie(cookieName: string, sessionData: DiamondSessionData | undefined, expirySecs: number = 0): void {
+type DiamondSessionData = {
+  id: string,
+  data: any,
+} | null | undefined
+type DiamondSessionStore = (sessionData: DiamondSessionData, expirySecs: number) => void
+function saveSessionCookie(cookieName: string | undefined, sessionData: DiamondSessionData, expirySecs: number = 0): void {
+  if (!cookieName) return;
   let cookieStr
   if (sessionData) {
     const sessionDataString = JSON.stringify(sessionData)
@@ -58,46 +117,23 @@ function saveSessionCookie(cookieName: string, sessionData: DiamondSessionData |
   }
   document.cookie = cookieStr
 }
-function getCookie(searchName: string) {
+function getCookie(searchName: string | undefined) {
+  if (!searchName) return ''
   const search = document.cookie.split(';')
     .map((cookieString: string): string[] => cookieString.trim().split('='))
     .filter(([name]: string[]) => (name === searchName))[0]
   return (search && search[1]) || ''
 }
-function getSessionData(cookieName: string): DiamondSessionData | undefined {
+function getSessionData(cookieName: string | undefined): DiamondSessionData {
   const sessionDataString = getCookie(cookieName)
   if (sessionDataString) {
     return JSON.parse(decodeURIComponent(sessionDataString))
   }
 }
-export function useCookieStore(cookieName: string): [DiamondSessionData | undefined, DiamondSessionStore] {
+export function useCookieStore(cookieName: string | undefined): [DiamondSessionData, DiamondSessionStore] {
   const [sessionData, setSessionData] = useState(getSessionData(cookieName))
-  return [sessionData, (newSessionData: DiamondSessionData | undefined, expirySecs: number) => {
+  return [sessionData, (newSessionData: DiamondSessionData, expirySecs: number) => {
     saveSessionCookie(cookieName, newSessionData, expirySecs)
     setSessionData(newSessionData)
   }]
 }
-
-// export function useInitUser(diamOpts: DiamondOptions, sessionData: DiamondSessionData | undefined): ContextValue {
-//   const client = new Diamond({
-//     ...diamOpts,
-//     sessionStore(newSessionData: DiamondSessionData, newExpirySecs: number = 0) {
-//       const newSessionString = JSON.stringify(newSessionData)
-//       saveSessionCookie(newSessionString, newExpirySecs)
-//       window.location.reload()
-//     },
-//     sessionData
-//   })
-//   const user = new User(diamond)
-//   function login() {
-//     diamond.login()
-//   }
-//   function logout() {
-//     saveSessionCookie('')
-//     window.location.reload()
-//   }
-//   userValue.client = client
-//   userValue.login = login
-//   userValue.logout = logout
-//   return userValue
-// }
