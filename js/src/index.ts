@@ -9,71 +9,74 @@ type FetchParams = {
   body?: string,
 }
 
-export type DiamondOptions = Partial<{
+export type DiamondOptions = {
+  teamId: string,
   projectId: string,
   appId: string,
-  host: string,
-  isLocal: boolean,
-  accessToken: string,
-}>
+  host?: string,
+  isLocal?: boolean,
+}
 
 const DEFAULT_API_HOST = 'diam.io'
-export class Diamond<SessionType = any> {
-  appId: string
-  projectId: string
+const PUBLIC_HEADERS = {
+  'Content-Type': 'application/json',
+}
+
+export class Diamond {
+  options: DiamondOptions
   apiOrigin: string
   apiUrl: string
 
   private headers: QueryHeaders
-  session?: SessionType
+  private basePath: string[]
 
-  constructor(options: DiamondOptions) {
+  constructor(options: DiamondOptions, headers: QueryHeaders = PUBLIC_HEADERS, basePath: string[] = []) {
     const {
-      projectId, appId,
-      isLocal = false,
-      accessToken,
+      teamId, projectId, appId,
+      isLocal = false, host,
     } = options
-    if (!projectId && !isLocal) {
+    if (!teamId) {
+      throw new Error('Diamond: Missing teamId')
+    }
+    if (!projectId) {
       throw new Error('Diamond: Missing projectId')
     }
     if (!appId) {
       throw new Error('Diamond: Missing appId')
     }
-    this.appId = appId
-    this.projectId = projectId || 'localhost'
-    const apiHost = options.host || (isLocal ? 'localhost' : DEFAULT_API_HOST)
-    this.apiOrigin = isLocal ? `http://${apiHost}` : `https://${projectId}.${apiHost}`
-    this.apiUrl = `${this.apiOrigin}/api/${appId}`
-    this.headers = {
-      'Content-Type': 'application/json',
-    }
-    if (accessToken) {
-      this.setToken(accessToken)
-    }
+    this.options = options
+    const apiHost = host || (isLocal ? 'localhost' : DEFAULT_API_HOST)
+    this.apiOrigin = isLocal ? `http://${apiHost}/${teamId}` : `https://${teamId}.${apiHost}`
+    this.apiUrl = `${this.apiOrigin}/${projectId}/${appId}/`
+    this.headers = headers
+    this.basePath = basePath
   }
-  setToken(token: string | undefined) {
-    if (token) {
-      this.headers.Authorization = `Bearer ${token}`
-    } else {
-      delete this.headers.Authorization
-    }
+  session(token: string): Diamond {
+    return new Diamond(this.options, {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    }, this.basePath)
+  }
+  as(path: string[]): Diamond {
+    return new Diamond(this.options, this.headers, [...this.basePath, ...path])
   }
   // trigger things:
   // - volatile, ordered, "atomic"/ack required
-  async query(endpoint: string, method: string = 'POST', body = {}, otherOpts: object = {}) {
-    const { headers, apiUrl } = this
+  async query(method: string, path: string[], body = {}, otherOpts: object = {}) {
+    const { headers, apiUrl, basePath } = this
+    const fullPath = [...basePath, ...path]
     try {
       const fetchParams: FetchParams = { ...otherOpts, method, headers }
       const isGet: boolean = (method.toLowerCase() === 'get')
       if (!isGet) {
         fetchParams.body = JSON.stringify(body)
       }
-      const url = `${apiUrl}${endpoint}${isGet ? `?${new URLSearchParams(body)}` : ''}`
+      const url = `${apiUrl}${fullPath.join('/')}${isGet ? `?${new URLSearchParams(body)}` : ''}`
       // console.log(fetchParams, isGet, url, fetchParams)
       const response = await fetch(url, fetchParams)
       return response.json()
     } catch (cause) {
-      throw new Error(`diam q: ${body} err: ${cause}`)
+      throw new Error(`diam q: ${JSON.stringify(body)} err: ${cause} ${apiUrl} ${method} ${fullPath.join('/')}`)
     }
   }
 }

@@ -27,9 +27,10 @@ const LOGIN_WINDOW_SETTINGS = [
 ].join(',')
 
 export type DiamondReactOptions = DiamondOptions & { cookie: string }
+type GetSessionFn = (diamond: Diamond, sessionData: any) => any
 type AppProps = {
   options: DiamondReactOptions,
-  getSession?: (diamond: Diamond, sessionData: any) => any,
+  getSession?: GetSessionFn,
   children: ReactNode,
 }
 
@@ -37,7 +38,7 @@ export function DiamondApp({ options, getSession, children }: AppProps) {
   const { cookie } = options
   const [sessionData, setSession] = useCookieStore(cookie)
   const client = useMemo<Diamond>(() => {
-    return new Diamond({
+    return new Diamond<typeof getSession extends GetSessionFn ? ReturnType<typeof getSession> : any>({
       ...options,
       accessToken: sessionData ? sessionData.id : undefined,
     })
